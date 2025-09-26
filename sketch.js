@@ -41,8 +41,19 @@ function setup () {
 }
 
 function draw () {
-  // Draw gradient background
-  drawGradientBackground()
+  // Compute smooth brightness based on all messages
+  let brightnessFactor = 0.3 // minimum background brightness
+  for (let i = 0; i < messages.length; i++) {
+    let msg = messages[i]
+    let msgCenterY = msg.y + height / 2
+    let distFromCenter = (msgCenterY - height / 2) / (height / 2)
+    distFromCenter = constrain(distFromCenter, -1, 1)
+    let influence = cos((distFromCenter * PI) / 2) // symmetric easing
+    brightnessFactor = max(brightnessFactor, 0.3 + 0.7 * influence)
+  }
+
+  // Draw radial gradient background with smooth brightness
+  drawGradientBackground(brightnessFactor)
 
   // Header
   fill(255)
@@ -79,7 +90,6 @@ function drawMessage (msgObj) {
   textAlign(LEFT, TOP)
   fill(255) // white text
 
-  // Estimate text height for vertical centering
   let estHeight = estimateTextHeight(
     msgObj.textStr,
     msgObj.boxW,
@@ -87,7 +97,7 @@ function drawMessage (msgObj) {
   )
   const startY = (height - estHeight) / 2
 
-  text(msgObj.textStr, msgObj.marginX, startY, msgObj.boxW) // p5 handles wrapping automatically
+  text(msgObj.textStr, msgObj.marginX, startY, msgObj.boxW)
   pop()
 }
 
@@ -108,7 +118,6 @@ function addMessage () {
   textSize(fontSize)
   textLeading(leading)
 
-  // Scale font down until estimated text fits canvas height
   while (true) {
     let estHeight = estimateTextHeight(textStr, boxW, leading)
     if (estHeight <= height * 0.9) break
@@ -134,7 +143,7 @@ function addMessage () {
 }
 
 // -------------------------
-// Estimate total text height for centering
+// Estimate total text height
 // -------------------------
 function estimateTextHeight (txt, maxW, leading) {
   let words = txt.split(/\s+/)
@@ -153,13 +162,13 @@ function estimateTextHeight (txt, maxW, leading) {
   if (curLine) lines.push(curLine)
 
   let lineHeight = textAscent() + textDescent()
-  return lines.length * lineHeight * (leading / (textAscent() + textDescent())) // scale by leading
+  return lines.length * lineHeight * (leading / (textAscent() + textDescent()))
 }
 
 // -------------------------
 // Draw smoothly changing pastel radial gradient
 // -------------------------
-function drawGradientBackground () {
+function drawGradientBackground (brightness) {
   let ctx = drawingContext
   let gradient = ctx.createRadialGradient(
     width / 2,
@@ -170,12 +179,13 @@ function drawGradientBackground () {
     max(width, height)
   )
 
-  let r = lerp(currentColor[0], nextColor[0], t)
-  let g = lerp(currentColor[1], nextColor[1], t)
-  let b = lerp(currentColor[2], nextColor[2], t)
+  // Interpolate base color
+  let r = lerp(currentColor[0], nextColor[0], t) * brightness
+  let g = lerp(currentColor[1], nextColor[1], t) * brightness
+  let b = lerp(currentColor[2], nextColor[2], t) * brightness
   let startColor = `rgb(${r},${g},${b})`
 
-  // darken edges to keep text readable
+  // Darker edges for readability
   let endColor = `rgb(${r * 0.2},${g * 0.2},${b * 0.2})`
 
   gradient.addColorStop(0, startColor)
@@ -184,6 +194,7 @@ function drawGradientBackground () {
   ctx.fillStyle = gradient
   ctx.fillRect(0, 0, width, height)
 
+  // Increment interpolation factor
   t += speed
   if (t >= 1) {
     t = 0
