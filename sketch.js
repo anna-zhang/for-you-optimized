@@ -4,6 +4,21 @@ let scrollSpeed = 1
 let canvasAspect = 1080 / 1920
 let messageBuffer = 20 // small gap between messages
 
+// Pastel-ish dark colors for aspirational style
+let baseColors = [
+  [120, 80, 150], // muted purple
+  [100, 150, 120], // soft green
+  [180, 100, 120], // pinkish
+  [150, 140, 90], // soft gold
+  [80, 130, 160] // pastel teal
+]
+
+let t = 0 // interpolation factor
+let speed = 0.0015 // gradient change speed
+let currentColor = baseColors[0]
+let nextColor = baseColors[1]
+let colorIndex = 0
+
 function preload () {
   data = loadStrings('highlights.txt')
 }
@@ -11,10 +26,13 @@ function preload () {
 function setup () {
   let h = windowHeight
   let w = canvasAspect * h
-  createCanvas(w, h)
+  let cnv = createCanvas(w, h)
   pixelDensity(displayDensity())
-  textFont('Helvetica')
+  textFont('Arial Narrow')
   frameRate(60)
+
+  // Center canvas horizontally and vertically
+  cnv.position((windowWidth - width) / 2, (windowHeight - height) / 2)
 
   markov = RiTa.markov(3)
   markov.addText(data.join(' '))
@@ -23,7 +41,8 @@ function setup () {
 }
 
 function draw () {
-  background(0)
+  // Draw gradient background
+  drawGradientBackground()
 
   // Header
   fill(255)
@@ -58,7 +77,7 @@ function drawMessage (msgObj) {
   textSize(msgObj.fontSize)
   textLeading(msgObj.leading)
   textAlign(LEFT, TOP)
-  fill(220)
+  fill(255) // white text
 
   // Estimate text height for vertical centering
   let estHeight = estimateTextHeight(
@@ -138,8 +157,50 @@ function estimateTextHeight (txt, maxW, leading) {
 }
 
 // -------------------------
+// Draw smoothly changing pastel radial gradient
+// -------------------------
+function drawGradientBackground () {
+  let ctx = drawingContext
+  let gradient = ctx.createRadialGradient(
+    width / 2,
+    height / 2,
+    0,
+    width / 2,
+    height / 2,
+    max(width, height)
+  )
+
+  let r = lerp(currentColor[0], nextColor[0], t)
+  let g = lerp(currentColor[1], nextColor[1], t)
+  let b = lerp(currentColor[2], nextColor[2], t)
+  let startColor = `rgb(${r},${g},${b})`
+
+  // darken edges to keep text readable
+  let endColor = `rgb(${r * 0.2},${g * 0.2},${b * 0.2})`
+
+  gradient.addColorStop(0, startColor)
+  gradient.addColorStop(1, endColor)
+
+  ctx.fillStyle = gradient
+  ctx.fillRect(0, 0, width, height)
+
+  t += speed
+  if (t >= 1) {
+    t = 0
+    colorIndex = (colorIndex + 1) % baseColors.length
+    currentColor = nextColor
+    nextColor = baseColors[(colorIndex + 1) % baseColors.length]
+  }
+}
+
+// -------------------------
 function windowResized () {
   let h = windowHeight
   let w = canvasAspect * h
   resizeCanvas(w, h)
+  // Re-center canvas
+  select('canvas').position(
+    (windowWidth - width) / 2,
+    (windowHeight - height) / 2
+  )
 }
