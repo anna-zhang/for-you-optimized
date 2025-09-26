@@ -1,8 +1,8 @@
 let markov, data
 let messages = []
-let scrollSpeed = 1
+let scrollSpeed = 0.8
 let canvasAspect = 1080 / 1920
-let messageBuffer = 20 // small gap between messages
+let messageBuffer = 0 // small gap between messages
 
 // Pastel-ish dark colors for aspirational style
 let baseColors = [
@@ -18,6 +18,9 @@ let speed = 0.0015 // gradient change speed
 let currentColor = baseColors[0]
 let nextColor = baseColors[1]
 let colorIndex = 0
+
+// Effective message height as fraction of canvas height
+let msgHeightFactor = 0.75
 
 function preload () {
   data = loadStrings('highlights.txt')
@@ -45,7 +48,7 @@ function draw () {
   let brightnessFactor = 0.3 // minimum background brightness
   for (let i = 0; i < messages.length; i++) {
     let msg = messages[i]
-    let msgCenterY = msg.y + height / 2
+    let msgCenterY = msg.y + (height * msgHeightFactor) / 2
     let distFromCenter = (msgCenterY - height / 2) / (height / 2)
     distFromCenter = constrain(distFromCenter, -1, 1)
     let influence = cos((distFromCenter * PI) / 2) // symmetric easing
@@ -68,12 +71,17 @@ function draw () {
   }
 
   // Remove messages offscreen
-  if (messages.length > 0 && messages[0].y + height < 0) {
+  if (messages.length > 0 && messages[0].y + height * msgHeightFactor < 0) {
     messages.shift()
   }
 
   // Add next message
-  if (messages.length === 0 || messages[messages.length - 1].y <= 0) {
+  // Trigger next message based on last message's center reaching 25% from top
+  if (
+    messages.length === 0 ||
+    messages[messages.length - 1].y + (height * msgHeightFactor) / 2 <=
+      height * 0.25
+  ) {
     addMessage()
   }
 }
@@ -88,14 +96,23 @@ function drawMessage (msgObj) {
   textSize(msgObj.fontSize)
   textLeading(msgObj.leading)
   textAlign(LEFT, TOP)
-  fill(255) // white text
+
+  // Compute normalized distance from center
+  let msgCenterY = msgObj.y + (height * msgHeightFactor) / 2
+  let distFromCenter = abs(msgCenterY - height / 2)
+  let norm = constrain(distFromCenter / (height / 2), 0, 1)
+
+  // Cosine-based opacity: 1 at center, 0 at edges
+  let opacity = cos((norm * PI) / 2) * 255
+
+  fill(255, opacity) // White text with fading opacity
 
   let estHeight = estimateTextHeight(
     msgObj.textStr,
     msgObj.boxW,
     msgObj.leading
   )
-  const startY = (height - estHeight) / 2
+  const startY = (height * msgHeightFactor - estHeight) / 2
 
   text(msgObj.textStr, msgObj.marginX, startY, msgObj.boxW)
   pop()
@@ -120,7 +137,7 @@ function addMessage () {
 
   while (true) {
     let estHeight = estimateTextHeight(textStr, boxW, leading)
-    if (estHeight <= height * 0.9) break
+    if (estHeight <= height * msgHeightFactor * 0.9) break
     fontSize *= 0.95
     leading *= 0.95
     textSize(fontSize)
@@ -130,7 +147,9 @@ function addMessage () {
   let startYPos =
     messages.length === 0
       ? 0
-      : messages[messages.length - 1].y + height + messageBuffer
+      : messages[messages.length - 1].y +
+        height * msgHeightFactor +
+        messageBuffer
 
   messages.push({
     textStr,
@@ -170,6 +189,20 @@ function estimateTextHeight (txt, maxW, leading) {
 // -------------------------
 function drawGradientBackground (brightness) {
   let ctx = drawingContext
+
+  // Interpolate multiple colors from baseColors array
+  let c0 = baseColors[colorIndex]
+  let c1 = baseColors[(colorIndex + 1) % baseColors.length]
+  let c2 = baseColors[(colorIndex + 2) % baseColors.length]
+
+  let r0 = lerp(c0[0], c1[0], t) * brightness
+  let g0 = lerp(c0[1], c1[1], t) * brightness
+  let b0 = lerp(c0[2], c1[2], t) * brightness
+
+  let r1 = lerp(c1[0], c2[0], t) * brightness
+  let g1 = lerp(c1[1], c2[1], t) * brightness
+  let b1 = lerp(c1[2], c2[2], t) * brightness
+
   let gradient = ctx.createRadialGradient(
     width / 2,
     height / 2,
@@ -179,17 +212,9 @@ function drawGradientBackground (brightness) {
     max(width, height)
   )
 
-  // Interpolate base color
-  let r = lerp(currentColor[0], nextColor[0], t) * brightness
-  let g = lerp(currentColor[1], nextColor[1], t) * brightness
-  let b = lerp(currentColor[2], nextColor[2], t) * brightness
-  let startColor = `rgb(${r},${g},${b})`
-
-  // Darker edges for readability
-  let endColor = `rgb(${r * 0.2},${g * 0.2},${b * 0.2})`
-
-  gradient.addColorStop(0, startColor)
-  gradient.addColorStop(1, endColor)
+  gradient.addColorStop(0, `rgb(${r0},${g0},${b0})`) // center
+  gradient.addColorStop(0.5, `rgb(${r1},${g1},${b1})`) // mid
+  gradient.addColorStop(1, `rgb(${r0 * 0.2},${g0 * 0.2},${b0 * 0.2})`) // edges darker
 
   ctx.fillStyle = gradient
   ctx.fillRect(0, 0, width, height)
@@ -199,8 +224,6 @@ function drawGradientBackground (brightness) {
   if (t >= 1) {
     t = 0
     colorIndex = (colorIndex + 1) % baseColors.length
-    currentColor = nextColor
-    nextColor = baseColors[(colorIndex + 1) % baseColors.length]
   }
 }
 
