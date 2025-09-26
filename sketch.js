@@ -1,90 +1,145 @@
-let lines, markov, data
-let cnv // store canvas reference
+let markov, data
+let messages = []
+let scrollSpeed = 1
+let canvasAspect = 1080 / 1920
+let messageBuffer = 20 // small gap between messages
 
 function preload () {
   data = loadStrings('highlights.txt')
 }
 
 function setup () {
-  // Canvas sized to window height using 1080:1920 aspect (portrait)
   let h = windowHeight
-  let w = (1080 / 1920) * h
-  cnv = createCanvas(w, h)
-  centerCanvas() // center initially
+  let w = canvasAspect * h
+  createCanvas(w, h)
   pixelDensity(displayDensity())
   textFont('Helvetica')
+  frameRate(60)
 
-  // Create and train markov (order 3)
   markov = RiTa.markov(3)
   markov.addText(data.join(' '))
 
-  // Generate 1–3 sentences initially
-  generateLines()
-
-  noLoop() // redraw on resize or click
-  drawText()
+  addMessage()
 }
 
 function draw () {
-  drawText()
-}
-
-function drawText () {
   background(0)
-  fill(255)
 
-  // Header at top center
+  // Header
+  fill(255)
   textSize(height * 0.035)
   textAlign(CENTER, TOP)
   text('(For) You, Optimized', width / 2, height * 0.02)
 
-  // Body text box with margins
-  const marginX = width * 0.08
-  const boxX = marginX
-  const boxY = height * 0.12
-  const boxW = width - marginX * 2
-  const boxH = height - boxY - height * 0.06
+  // Draw messages
+  for (let i = messages.length - 1; i >= 0; i--) {
+    drawMessage(messages[i])
+    messages[i].y -= scrollSpeed
+  }
 
-  // Font size and leading
-  const fontSize = constrain(Math.round(height * 0.03), 12, 64)
-  const leading = Math.round(fontSize * 1.25)
+  // Remove messages offscreen
+  if (messages.length > 0 && messages[0].y + height < 0) {
+    messages.shift()
+  }
+
+  // Add next message
+  if (messages.length === 0 || messages[messages.length - 1].y <= 0) {
+    addMessage()
+  }
+}
+
+// -------------------------
+// Draw a single Markov message
+// -------------------------
+function drawMessage (msgObj) {
+  push()
+  translate(0, msgObj.y)
+
+  textSize(msgObj.fontSize)
+  textLeading(msgObj.leading)
+  textAlign(LEFT, TOP)
+  fill(220)
+
+  // Estimate text height for vertical centering
+  let estHeight = estimateTextHeight(
+    msgObj.textStr,
+    msgObj.boxW,
+    msgObj.leading
+  )
+  const startY = (height - estHeight) / 2
+
+  text(msgObj.textStr, msgObj.marginX, startY, msgObj.boxW) // p5 handles wrapping automatically
+  pop()
+}
+
+// -------------------------
+// Add a new Markov message
+// -------------------------
+function addMessage () {
+  const n = Math.floor(random(1, 4))
+  let msg = n === 1 ? markov.generate() : markov.generate(n)
+  if (!Array.isArray(msg)) msg = [String(msg)]
+  let textStr = msg.join(' ')
+
+  const marginX = width * 0.08
+  const boxW = width - marginX * 2
+  let fontSize = height * 0.03
+  let leading = fontSize * 1.2
+
   textSize(fontSize)
   textLeading(leading)
-  textAlign(LEFT, TOP)
 
-  // Draw the generated text
-  text(lines.join(' '), boxX, boxY, boxW, boxH)
-}
-
-// Generate 1–3 sentences, handling n=1 correctly
-function generateLines () {
-  const n = Math.floor(random(1, 4)) // 1, 2, or 3
-  if (n === 1) {
-    lines = [markov.generate()] // single string wrapped in array
-  } else {
-    lines = markov.generate(n) // array of strings
+  // Scale font down until estimated text fits canvas height
+  while (true) {
+    let estHeight = estimateTextHeight(textStr, boxW, leading)
+    if (estHeight <= height * 0.9) break
+    fontSize *= 0.95
+    leading *= 0.95
+    textSize(fontSize)
+    textLeading(leading)
   }
-  if (!Array.isArray(lines)) lines = [String(lines)]
+
+  let startYPos =
+    messages.length === 0
+      ? 0
+      : messages[messages.length - 1].y + height + messageBuffer
+
+  messages.push({
+    textStr,
+    fontSize,
+    leading,
+    y: startYPos,
+    marginX,
+    boxW
+  })
 }
 
-// Regenerate text on click
-function mouseClicked () {
-  generateLines()
-  redraw()
+// -------------------------
+// Estimate total text height for centering
+// -------------------------
+function estimateTextHeight (txt, maxW, leading) {
+  let words = txt.split(/\s+/)
+  let lines = []
+  let curLine = ''
+
+  for (let w of words) {
+    let testLine = curLine ? curLine + ' ' + w : w
+    if (textWidth(testLine) <= maxW) {
+      curLine = testLine
+    } else {
+      if (curLine) lines.push(curLine)
+      curLine = w
+    }
+  }
+  if (curLine) lines.push(curLine)
+
+  let lineHeight = textAscent() + textDescent()
+  return lines.length * lineHeight * (leading / (textAscent() + textDescent())) // scale by leading
 }
 
-// Keep portrait 1080:1920 aspect & fill window height
+// -------------------------
 function windowResized () {
-  const h = windowHeight
-  const w = (1080 / 1920) * h
+  let h = windowHeight
+  let w = canvasAspect * h
   resizeCanvas(w, h)
-  centerCanvas() // recenter on resize
-  redraw()
-}
-
-// Function to center the canvas in the window
-function centerCanvas () {
-  const x = (windowWidth - width) / 2
-  const y = (windowHeight - height) / 2
-  cnv.position(x, y)
 }
