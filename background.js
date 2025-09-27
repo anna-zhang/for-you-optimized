@@ -3,7 +3,7 @@ function fillBackgroundText (data) {
   const bgDiv = document.getElementById('background-text')
   bgDiv.innerHTML = '' // clear
 
-  // Create continuous highlight string
+  // Create array of formatted highlights
   let highlightsArray = []
   data.books.forEach(book => {
     if (book.highlights) {
@@ -19,20 +19,26 @@ function fillBackgroundText (data) {
 
   if (highlightsArray.length === 0) return
 
-  let allText = ''
-  const paddingTopBottom =
-    parseFloat(getComputedStyle(container).paddingTop) +
-    parseFloat(getComputedStyle(container).paddingBottom)
-  const maxHeight = container.clientHeight - paddingTopBottom
+  function fillText () {
+    let allText = ''
+    const paddingTopBottom =
+      parseFloat(getComputedStyle(container).paddingTop) +
+      parseFloat(getComputedStyle(container).paddingBottom)
+    const maxHeight = container.clientHeight - paddingTopBottom
 
-  // Temporarily append to measure height
-  bgDiv.textContent = ''
-  let idx = 0
-  while (bgDiv.scrollHeight < maxHeight) {
-    allText += highlightsArray[idx % highlightsArray.length] + ' '
-    bgDiv.textContent = allText
-    idx++
-    // Safety to prevent infinite loop
-    if (idx > 1000) break
+    bgDiv.textContent = '' // reset
+    let idx = 0
+    while (bgDiv.scrollHeight < maxHeight) {
+      allText += highlightsArray[idx % highlightsArray.length] + ' '
+      bgDiv.textContent = allText
+      idx++
+      if (idx > 1000) break // safety
+    }
   }
+
+  // Initial fill
+  fillText()
+
+  // Refill on window resize
+  window.addEventListener('resize', fillText)
 }
