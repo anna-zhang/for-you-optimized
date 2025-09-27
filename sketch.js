@@ -23,7 +23,8 @@ let colorIndex = 0
 let msgHeightFactor = 0.75
 
 function preload () {
-  data = loadStrings('highlights.txt')
+  // Load JSON file with highlights
+  data = loadJSON('highlights.json')
 }
 
 function setup () {
@@ -34,28 +35,42 @@ function setup () {
   textFont('Arial Narrow')
   frameRate(60)
 
-  // Center canvas horizontally and vertically
+  // Center canvas
   cnv.position((windowWidth - width) / 2, (windowHeight - height) / 2)
 
   markov = RiTa.markov(3)
-  markov.addText(data.join(' '))
 
-  addMessage()
+  let quotes = []
+
+  // Parse JSON structure: { books: [ {title, authors, highlights:[...]}, ... ] }
+  if (data && data.books) {
+    data.books.forEach(book => {
+      if (book.highlights) {
+        quotes.push(...book.highlights.map(h => h.quote))
+      }
+    })
+  }
+
+  if (quotes.length === 0) {
+    console.error('No highlights found in JSON')
+  } else {
+    markov.addText(quotes.join(' '))
+    addMessage()
+  }
 }
 
 function draw () {
-  // Compute smooth brightness based on all messages
-  let brightnessFactor = 0.3 // minimum background brightness
+  // Compute smooth brightness based on messages
+  let brightnessFactor = 0.3
   for (let i = 0; i < messages.length; i++) {
     let msg = messages[i]
     let msgCenterY = msg.y + (height * msgHeightFactor) / 2
     let distFromCenter = (msgCenterY - height / 2) / (height / 2)
     distFromCenter = constrain(distFromCenter, -1, 1)
-    let influence = cos((distFromCenter * PI) / 2) // symmetric easing
+    let influence = cos((distFromCenter * PI) / 2)
     brightnessFactor = max(brightnessFactor, 0.3 + 0.7 * influence)
   }
 
-  // Draw radial gradient background with smooth brightness
   drawGradientBackground(brightnessFactor)
 
   // Header
@@ -64,19 +79,18 @@ function draw () {
   textAlign(CENTER, TOP)
   text('(For) You, Optimized', width / 2, height * 0.05)
 
-  // Draw messages
+  // Draw & scroll messages
   for (let i = messages.length - 1; i >= 0; i--) {
     drawMessage(messages[i])
     messages[i].y -= scrollSpeed
   }
 
-  // Remove messages offscreen
+  // Remove old
   if (messages.length > 0 && messages[0].y + height * msgHeightFactor < 0) {
     messages.shift()
   }
 
-  // Add next message
-  // Trigger next message based on last message's center reaching 25% from top
+  // Add new when last one passes 25% from top
   if (
     messages.length === 0 ||
     messages[messages.length - 1].y + (height * msgHeightFactor) / 2 <=
@@ -86,9 +100,6 @@ function draw () {
   }
 }
 
-// -------------------------
-// Draw a single Markov message
-// -------------------------
 function drawMessage (msgObj) {
   push()
   translate(0, msgObj.y)
@@ -97,15 +108,12 @@ function drawMessage (msgObj) {
   textLeading(msgObj.leading)
   textAlign(LEFT, TOP)
 
-  // Compute normalized distance from center
   let msgCenterY = msgObj.y + (height * msgHeightFactor) / 2
   let distFromCenter = abs(msgCenterY - height / 2)
   let norm = constrain(distFromCenter / (height / 2), 0, 1)
-
-  // Cosine-based opacity: 1 at center, 0 at edges
   let opacity = cos((norm * PI) / 2) * 255
 
-  fill(255, opacity) // White text with fading opacity
+  fill(255, opacity)
 
   let estHeight = estimateTextHeight(
     msgObj.textStr,
@@ -118,9 +126,6 @@ function drawMessage (msgObj) {
   pop()
 }
 
-// -------------------------
-// Add a new Markov message
-// -------------------------
 function addMessage () {
   const n = Math.floor(random(1, 4))
   let msg = n === 1 ? markov.generate() : markov.generate(n)
@@ -161,9 +166,6 @@ function addMessage () {
   })
 }
 
-// -------------------------
-// Estimate total text height
-// -------------------------
 function estimateTextHeight (txt, maxW, leading) {
   let words = txt.split(/\s+/)
   let lines = []
@@ -184,13 +186,8 @@ function estimateTextHeight (txt, maxW, leading) {
   return lines.length * lineHeight * (leading / (textAscent() + textDescent()))
 }
 
-// -------------------------
-// Draw smoothly changing pastel radial gradient
-// -------------------------
 function drawGradientBackground (brightness) {
   let ctx = drawingContext
-
-  // Interpolate multiple colors from baseColors array
   let c0 = baseColors[colorIndex]
   let c1 = baseColors[(colorIndex + 1) % baseColors.length]
   let c2 = baseColors[(colorIndex + 2) % baseColors.length]
@@ -212,14 +209,13 @@ function drawGradientBackground (brightness) {
     max(width, height)
   )
 
-  gradient.addColorStop(0, `rgb(${r0},${g0},${b0})`) // center
-  gradient.addColorStop(0.5, `rgb(${r1},${g1},${b1})`) // mid
-  gradient.addColorStop(1, `rgb(${r0 * 0.2},${g0 * 0.2},${b0 * 0.2})`) // edges darker
+  gradient.addColorStop(0, `rgb(${r0},${g0},${b0})`)
+  gradient.addColorStop(0.5, `rgb(${r1},${g1},${b1})`)
+  gradient.addColorStop(1, `rgb(${r0 * 0.2},${g0 * 0.2},${b0 * 0.2})`)
 
   ctx.fillStyle = gradient
   ctx.fillRect(0, 0, width, height)
 
-  // Increment interpolation factor
   t += speed
   if (t >= 1) {
     t = 0
@@ -227,12 +223,10 @@ function drawGradientBackground (brightness) {
   }
 }
 
-// -------------------------
 function windowResized () {
   let h = windowHeight * 0.85
   let w = canvasAspect * h
   resizeCanvas(w, h)
-  // Re-center canvas
   select('canvas').position(
     (windowWidth - width) / 2,
     (windowHeight - height) / 2
