@@ -1,6 +1,6 @@
 let markov, data
 let messages = []
-let scrollSpeed = 0.8
+let scrollSpeed = 0.5
 let canvasAspect = 1080 / 1920
 let messageBuffer = 0 // small gap between messages
 
@@ -27,7 +27,7 @@ function preload () {
 }
 
 function setup () {
-  let h = windowHeight
+  let h = windowHeight * 0.85
   let w = canvasAspect * h
   let cnv = createCanvas(w, h)
   pixelDensity(displayDensity())
@@ -62,7 +62,7 @@ function draw () {
   fill(255)
   textSize(height * 0.035)
   textAlign(CENTER, TOP)
-  text('(For) You, Optimized', width / 2, height * 0.02)
+  text('(For) You, Optimized', width / 2, height * 0.05)
 
   // Draw messages
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -229,7 +229,7 @@ function drawGradientBackground (brightness) {
 
 // -------------------------
 function windowResized () {
-  let h = windowHeight
+  let h = windowHeight * 0.85
   let w = canvasAspect * h
   resizeCanvas(w, h)
   // Re-center canvas
