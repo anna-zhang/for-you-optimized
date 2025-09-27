@@ -17,7 +17,7 @@
         // Run after sketch.js loads and JSON is available
         fetch('highlights.json')
         .then(res => res.json())
-        .then(data => fillBackgroundText(data));
+        .then(data => initBackgroundText(data));
     </script>
     </body>
 </html>

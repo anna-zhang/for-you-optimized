@@ -2,64 +2,60 @@ function fillBackgroundText (data) {
   const bgDiv = document.getElementById('background-text')
   bgDiv.innerHTML = '' // clear
 
-  // Combine highlights into one array of formatted strings
-  let highlightsArray = []
+  // Build one long highlights string from data
+  let highlightsString = ''
   data.books.forEach(book => {
     if (book.highlights) {
       book.highlights.forEach(h => {
-        highlightsArray.push(
-          `"${h.quote}" (${book.title} by ${book.authors.join(', ')}, pp. ${
-            h.page
-          }, ${h.highlights.toLocaleString()} highlights)`
-        )
+        highlightsString += `"${h.quote}" (${book.title} by ${book.authors.join(
+          ', '
+        )}, pp. ${h.page}, ${h.highlights.toLocaleString()} highlights) `
       })
     }
   })
 
-  if (highlightsArray.length === 0) return
+  if (!highlightsString) return
 
-  // Repeat highlights until background overfills vertically
-  let repeatedText = ''
-  while (repeatedText.length < 20000) {
-    // cap for performance
-    repeatedText += highlightsArray.join(' ') + ' '
-  }
-
-  bgDiv.textContent = repeatedText
-
-  trimCutoffLine(bgDiv, repeatedText)
-}
-
-function trimCutoffLine (bgDiv, text) {
+  // Repeat enough to guarantee overfill (start fresh each call!)
   const containerHeight = bgDiv.clientHeight
-  const scrollHeight = bgDiv.scrollHeight
-  const lineHeight = parseFloat(window.getComputedStyle(bgDiv).lineHeight)
+  let repeatedText = highlightsString.repeat(50)
 
-  if (scrollHeight > containerHeight) {
-    // Remove words until it fits
-    let trimmed = text.trim()
-    do {
-      trimmed = trimmed.replace(/\s+\S+$/, '') // drop the last word
-      bgDiv.textContent = trimmed
-    } while (bgDiv.scrollHeight > containerHeight)
+  // Binary search for max substring that fits
+  let start = 0
+  let end = repeatedText.length
+  let bestFit = ''
 
-    // Double-check for descender cutoff
-    if (containerHeight - bgDiv.clientHeight < lineHeight / 2) {
-      trimmed = trimmed.replace(/\s+\S+$/, '')
-      bgDiv.textContent = trimmed
+  while (start <= end) {
+    const mid = Math.floor((start + end) / 2)
+    bgDiv.textContent = repeatedText.slice(0, mid)
+
+    if (bgDiv.scrollHeight <= containerHeight) {
+      bestFit = bgDiv.textContent
+      start = mid + 1
+    } else {
+      end = mid - 1
     }
   }
+
+  // Ensure last visible line is not cropped
+  bgDiv.textContent = bestFit
+  while (bgDiv.scrollHeight > containerHeight) {
+    bestFit = bestFit.slice(0, -1)
+    bgDiv.textContent = bestFit
+  }
 }
 
-// Run on resize
+// Always recompute from scratch on resize
 window.addEventListener('resize', () => {
   if (window.backgroundTextData) {
-    fillBackgroundText(window.backgroundTextData)
+    fillBackgroundText(window.backgroundTextData) // rebuilds fully
+    console.log('rebuilding: ', window.backgroundTextData)
   }
 })
 
-// Store data globally so resize can use it again
+// Initialize background text
 function initBackgroundText (data) {
   window.backgroundTextData = data
   fillBackgroundText(data)
+  console.log('initBackgroundText: ', data)
 }
