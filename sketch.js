@@ -58,6 +58,7 @@ function setup () {
 function draw () {
   let brightnessFactor = 0.3
 
+  // Compute gradient brightness based on messages
   for (let i = 0; i < messages.length; i++) {
     let msg = messages[i]
     let msgCenterY = msg.y + (height * msgHeightFactor) / 2
@@ -77,8 +78,13 @@ function draw () {
 
   // Draw & scroll messages
   for (let i = messages.length - 1; i >= 0; i--) {
-    drawMessage(messages[i])
-    messages[i].y -= scrollSpeed
+    let msg = messages[i]
+
+    // Dynamic scroll speed proportional to font size
+    let scrollSpeed = constrain(msg.fontSize * 0.02, 0.15, 1.75)
+
+    msg.y -= scrollSpeed
+    drawMessage(msg)
   }
 
   // Remove old messages
@@ -86,7 +92,7 @@ function draw () {
     messages.shift()
   }
 
-  // Add new when last one passes 25% from top
+  // Add new message when last one passes 25% from top
   if (
     messages.length === 0 ||
     messages[messages.length - 1].y + (height * msgHeightFactor) / 2 <=
