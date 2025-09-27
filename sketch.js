@@ -1,7 +1,6 @@
 let markov, data
 let messages = []
 let scrollSpeed = 0.5
-let canvasAspect = 1080 / 1920
 let messageBuffer = 0 // small gap between messages
 
 // Pastel-ish dark colors for aspirational style
@@ -15,45 +14,31 @@ let baseColors = [
 
 let t = 0 // interpolation factor
 let speed = 0.0015 // gradient change speed
-let currentColor = baseColors[0]
-let nextColor = baseColors[1]
 let colorIndex = 0
 
 // Effective message height as fraction of canvas height
 let msgHeightFactor = 0.75
 
 function preload () {
-  // Load JSON file with highlights
   data = loadJSON('highlights.json')
 }
 
 function setup () {
-  let h = windowHeight * 0.85
-  let w = canvasAspect * h
-  let cnv = createCanvas(w, h)
+  // Create a temporary small canvas first
+  let cnv = createCanvas(100, 100)
+  cnv.parent('phone-container')
   pixelDensity(displayDensity())
   textFont('Arial Narrow')
   frameRate(60)
 
-  // Center canvas
-  cnv.position((windowWidth - width) / 2, (windowHeight - height) / 2)
-
   markov = RiTa.markov(3)
 
   let quotes = []
-  let fullDisplayTexts = []
-
   if (data && data.books) {
     data.books.forEach(book => {
       if (book.highlights) {
         book.highlights.forEach(h => {
           quotes.push(h.quote)
-
-          // Build full display string
-          let display = `"${h.quote}" (${book.title} by ${book.authors.join(
-            ', '
-          )}, pp. ${h.page || '–'}, ${h.highlights || 0} highlights)`
-          fullDisplayTexts.push(display)
         })
       }
     })
@@ -65,11 +50,14 @@ function setup () {
     markov.addText(quotes.join(' '))
     addMessage()
   }
+
+  // Resize phone container and canvas
+  resizePhoneContainerAndCanvas()
 }
 
 function draw () {
-  // Compute smooth brightness based on messages
   let brightnessFactor = 0.3
+
   for (let i = 0; i < messages.length; i++) {
     let msg = messages[i]
     let msgCenterY = msg.y + (height * msgHeightFactor) / 2
@@ -83,9 +71,9 @@ function draw () {
 
   // Header
   fill(255)
-  textSize(height * 0.035)
+  textSize(height * 0.0225)
   textAlign(CENTER, TOP)
-  text('(For) You, Optimized', width / 2, height * 0.05)
+  text('(For) You, Optimized', width / 2, height * 0.065)
 
   // Draw & scroll messages
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -93,7 +81,7 @@ function draw () {
     messages[i].y -= scrollSpeed
   }
 
-  // Remove old
+  // Remove old messages
   if (messages.length > 0 && messages[0].y + height * msgHeightFactor < 0) {
     messages.shift()
   }
@@ -142,15 +130,19 @@ function addMessage () {
 
   const marginX = width * 0.08
   const boxW = width - marginX * 2
-  let fontSize = height * 0.03
+
+  // Base font size proportional to canvas height
+  let fontSize = height * 0.0275
   let leading = fontSize * 1.2
 
   textSize(fontSize)
   textLeading(leading)
 
+  // Scale down font if message is taller than allowed fraction of canvas
+  const maxHeightFactor = msgHeightFactor * 0.9
   while (true) {
     let estHeight = estimateTextHeight(textStr, boxW, leading)
-    if (estHeight <= height * msgHeightFactor * 0.9) break
+    if (estHeight <= height * maxHeightFactor) break
     fontSize *= 0.95
     leading *= 0.95
     textSize(fontSize)
@@ -231,12 +223,55 @@ function drawGradientBackground (brightness) {
   }
 }
 
+// Create responsive phone container
+function resizePhoneContainerAndCanvas () {
+  const container = document.getElementById('phone-container')
+  const notch = document.querySelector('.phone-notch')
+  const windowW = window.innerWidth
+  const windowH = window.innerHeight
+
+  const phoneAspect = 360 / 780 // iPhone aspect ratio
+  let containerW, containerH
+
+  if (windowW / windowH > phoneAspect) {
+    containerH = windowH * 0.75
+    containerW = containerH * phoneAspect
+  } else {
+    containerW = windowW * 0.75
+    containerH = containerW / phoneAspect
+  }
+
+  container.style.width = `${containerW}px`
+  container.style.height = `${containerH}px`
+
+  // Dynamically scale corner radius
+  const cornerRadius = containerW * 0.14 // proportional to width (30px at 360px width)
+  container.style.borderRadius = `${cornerRadius}px`
+
+  // Set canvas to exact container size
+  const cnv = select('canvas')
+  resizeCanvas(containerW, containerH)
+  cnv.position(0, 0)
+  cnv.elt.style.borderRadius = `${cornerRadius}px`
+
+  // Resize notch proportionally
+  const notchWidth = containerW * 0.33 // 120px at 360px width
+  const notchHeight = containerH * 0.038 // 30px at 780px height
+  const notchRadius = notchHeight * 0.5
+  notch.style.width = `${notchWidth}px`
+  notch.style.height = `${notchHeight}px`
+  notch.style.borderBottomLeftRadius = `${notchRadius}px`
+  notch.style.borderBottomRightRadius = `${notchRadius}px`
+
+  // Center notch
+  notch.style.left = '50%'
+  notch.style.transform = 'translateX(-50%)'
+
+  // Rebuild messages to fit new size
+  messages = []
+  addMessage()
+}
+
 function windowResized () {
-  let h = windowHeight * 0.85
-  let w = canvasAspect * h
-  resizeCanvas(w, h)
-  select('canvas').position(
-    (windowWidth - width) / 2,
-    (windowHeight - height) / 2
-  )
+  resizePhoneContainerAndCanvas()
 }

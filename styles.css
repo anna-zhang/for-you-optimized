@@ -37,4 +37,51 @@ canvas {
   position: relative;
   z-index: 1; /* above background text */
   display: block;
+
+  /* Elevation effect */
+  box-shadow:
+    0 20px 40px rgba(0, 0, 0, 0.4),   /* dark shadow beneath */
+    0 0 60px rgba(255, 255, 255, 0.1); /* subtle glow */
+  border-radius: 30px;                  /* rounded phone corners */
+
+}
+
+
+/* Widths for notch & corners are set dynamically */
+#phone-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50px; /* placeholder, will be overwritten in JS */
+  background: #111;
+  box-shadow:
+    0 20px 40px rgba(0,0,0,0.4),
+    0 0 60px rgba(255,255,255,0.05);
+  overflow: hidden;
+  z-index: 2;
+}
+
+/* Canvas fills phone screen */
+#phone-container canvas {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 30px; /* placeholder, overwritten in JS */
+  box-shadow:
+    0 20px 40px rgba(0,0,0,0.4),
+    0 0 60px rgba(255,255,255,0.1);
+}
+
+/* Notch */
+.phone-notch {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #111;
+  border-bottom-left-radius: 15px; /* placeholder, overwritten in JS */
+  border-bottom-right-radius: 15px; /* placeholder, overwritten in JS */
+  z-index: 3;
 }
