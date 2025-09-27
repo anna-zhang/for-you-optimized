@@ -41,12 +41,20 @@ function setup () {
   markov = RiTa.markov(3)
 
   let quotes = []
+  let fullDisplayTexts = []
 
-  // Parse JSON structure: { books: [ {title, authors, highlights:[...]}, ... ] }
   if (data && data.books) {
     data.books.forEach(book => {
       if (book.highlights) {
-        quotes.push(...book.highlights.map(h => h.quote))
+        book.highlights.forEach(h => {
+          quotes.push(h.quote)
+
+          // Build full display string
+          let display = `"${h.quote}" (${book.title} by ${book.authors.join(
+            ', '
+          )}, pp. ${h.page || '–'}, ${h.highlights || 0} highlights)`
+          fullDisplayTexts.push(display)
+        })
       }
     })
   }

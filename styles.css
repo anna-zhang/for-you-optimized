@@ -2,8 +2,38 @@ html, body {
   margin: 0;
   padding: 0;
   background-color: black;
+  color: white;
+  font-family: 'Arial Narrow', sans-serif;
+  overflow: hidden;
 }
 
+#background-text-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  padding: 2em; /* padding on all sides */
+  box-sizing: border-box;
+  overflow: hidden; /* clip overflowing text */
+  z-index: 0;
+}
+
+#background-text {
+  width: 100%;
+  color: rgba(255, 255, 255, 0.3);
+  font-family: "Arial Narrow", sans-serif;
+  font-size: 14px;
+  line-height: 1.2em;
+  text-align: justify;
+  text-align-last: justify;
+  white-space: normal;
+}
+
+
+
 canvas {
+  position: relative;
+  z-index: 1; /* above background text */
   display: block;
 }
