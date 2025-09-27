@@ -1,9 +1,8 @@
 function fillBackgroundText (data) {
-  const container = document.getElementById('background-text-container')
   const bgDiv = document.getElementById('background-text')
   bgDiv.innerHTML = '' // clear
 
-  // Create array of formatted highlights
+  // Combine highlights into one array of formatted strings
   let highlightsArray = []
   data.books.forEach(book => {
     if (book.highlights) {
@@ -19,26 +18,48 @@ function fillBackgroundText (data) {
 
   if (highlightsArray.length === 0) return
 
-  function fillText () {
-    let allText = ''
-    const paddingTopBottom =
-      parseFloat(getComputedStyle(container).paddingTop) +
-      parseFloat(getComputedStyle(container).paddingBottom)
-    const maxHeight = container.clientHeight - paddingTopBottom
-
-    bgDiv.textContent = '' // reset
-    let idx = 0
-    while (bgDiv.scrollHeight < maxHeight) {
-      allText += highlightsArray[idx % highlightsArray.length] + ' '
-      bgDiv.textContent = allText
-      idx++
-      if (idx > 1000) break // safety
-    }
+  // Repeat highlights until background overfills vertically
+  let repeatedText = ''
+  while (repeatedText.length < 20000) {
+    // cap for performance
+    repeatedText += highlightsArray.join(' ') + ' '
   }
 
-  // Initial fill
-  fillText()
+  bgDiv.textContent = repeatedText
 
-  // Refill on window resize
-  window.addEventListener('resize', fillText)
+  trimCutoffLine(bgDiv, repeatedText)
+}
+
+function trimCutoffLine (bgDiv, text) {
+  const containerHeight = bgDiv.clientHeight
+  const scrollHeight = bgDiv.scrollHeight
+  const lineHeight = parseFloat(window.getComputedStyle(bgDiv).lineHeight)
+
+  if (scrollHeight > containerHeight) {
+    // Remove words until it fits
+    let trimmed = text.trim()
+    do {
+      trimmed = trimmed.replace(/\s+\S+$/, '') // drop the last word
+      bgDiv.textContent = trimmed
+    } while (bgDiv.scrollHeight > containerHeight)
+
+    // Double-check for descender cutoff
+    if (containerHeight - bgDiv.clientHeight < lineHeight / 2) {
+      trimmed = trimmed.replace(/\s+\S+$/, '')
+      bgDiv.textContent = trimmed
+    }
+  }
+}
+
+// Run on resize
+window.addEventListener('resize', () => {
+  if (window.backgroundTextData) {
+    fillBackgroundText(window.backgroundTextData)
+  }
+})
+
+// Store data globally so resize can use it again
+function initBackgroundText (data) {
+  window.backgroundTextData = data
+  fillBackgroundText(data)
 }

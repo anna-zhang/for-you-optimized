@@ -13,24 +13,25 @@ html, body {
   left: 0;
   width: 100%;
   height: 100%;
-  padding: 2em; /* padding on all sides */
+  padding: 2em;
   box-sizing: border-box;
-  overflow: hidden; /* clip overflowing text */
+  overflow: hidden;
   z-index: 0;
 }
 
 #background-text {
-  width: 100%;
   color: rgba(255, 255, 255, 0.3);
   font-family: "Arial Narrow", sans-serif;
   font-size: 14px;
   line-height: 1.2em;
   text-align: justify;
-  text-align-last: justify;
+  text-align-last: justify; /* justify last line */
   white-space: normal;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
 }
-
-
 
 canvas {
   position: relative;
