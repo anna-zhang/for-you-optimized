@@ -1,61 +1,114 @@
+// background.js
+
+// Build one long interleaved highlights string and fill the #background-text element.
 function fillBackgroundText (data) {
   const bgDiv = document.getElementById('background-text')
-  bgDiv.innerHTML = '' // clear
+  if (!bgDiv || !data || !Array.isArray(data.books)) return
 
-  // Build one long highlights string from data
-  let highlightsString = ''
-  data.books.forEach(book => {
-    if (book.highlights) {
-      book.highlights.forEach(h => {
-        highlightsString += `"${h.quote}" (${book.title} by ${book.authors.join(
+  // 1) Interleave (round-robin) highlights across books
+  const interleaved = []
+  const books = data.books
+  const maxHighlights = Math.max(...books.map(b => (b.highlights || []).length))
+
+  for (let i = 0; i < maxHighlights; i++) {
+    for (let b = 0; b < books.length; b++) {
+      const h = (books[b].highlights || [])[i]
+      if (!h) continue
+      interleaved.push(
+        `"${h.quote}" (${books[b].title} by ${books[b].authors.join(
           ', '
-        )}, pp. ${h.page}, ${h.highlights.toLocaleString()} highlights) `
-      })
+        )}, pp. ${h.page}, ${h.highlights.toLocaleString()} highlights)`
+      )
     }
-  })
+  }
 
+  let highlightsString = interleaved.join(' ')
   if (!highlightsString) return
 
-  // Repeat enough to guarantee overfill (start fresh each call!)
+  // 2) Repeat the string until the content definitely overflows the container height
+  bgDiv.textContent = '' // clear
   const containerHeight = bgDiv.clientHeight
-  let repeatedText = highlightsString.repeat(50)
+  let repeated = highlightsString
+  // Keep appending until scrollHeight > containerHeight (or safety cap)
+  const SAFETY_CAP = 200 // avoid infinite loop
+  let caps = 0
+  bgDiv.textContent = repeated
+  while (bgDiv.scrollHeight <= containerHeight && caps < SAFETY_CAP) {
+    repeated += ' ' + highlightsString
+    bgDiv.textContent = repeated
+    caps++
+  }
 
-  // Binary search for max substring that fits
-  let start = 0
-  let end = repeatedText.length
-  let bestFit = ''
+  // 3) If it now overflows, trim characters from the end until it fits exactly
+  //    but make sure the *last visible line* contains whole characters (not cut descenders).
+  //    We'll binary-search for the longest prefix that still fits.
+  if (bgDiv.scrollHeight > containerHeight) {
+    let full = repeated
+    let lo = 0
+    let hi = full.length
+    let best = ''
 
-  while (start <= end) {
-    const mid = Math.floor((start + end) / 2)
-    bgDiv.textContent = repeatedText.slice(0, mid)
+    while (lo <= hi) {
+      const mid = Math.floor((lo + hi) / 2)
+      bgDiv.textContent = full.slice(0, mid)
+      if (bgDiv.scrollHeight <= containerHeight) {
+        best = full.slice(0, mid)
+        lo = mid + 1
+      } else {
+        hi = mid - 1
+      }
+    }
 
-    if (bgDiv.scrollHeight <= containerHeight) {
-      bestFit = bgDiv.textContent
-      start = mid + 1
-    } else {
-      end = mid - 1
+    bgDiv.textContent = best
+
+    // If the last visible line still has letters clipped vertically (descenders),
+    // remove that whole last visible line. We use a Range to compute visible line rects.
+    const range = document.createRange()
+    range.selectNodeContents(bgDiv)
+    const rects = range.getClientRects()
+    if (rects.length) {
+      const lastRect = rects[rects.length - 1]
+      // if lastRect.bottom is greater than the container's inner bottom (allow tiny epsilon),
+      // remove that line by trimming words from the end until it disappears.
+      const epsilon = 1 // pixel tolerance
+      if (
+        lastRect.bottom - bgDiv.getBoundingClientRect().top >
+        containerHeight + epsilon
+      ) {
+        // remove the entire last visual line (approx by removing words until the last rect changes)
+        let cur = bgDiv.textContent.trim()
+        let prevRects = rects
+        while (cur.length) {
+          cur = cur.replace(/\s+\S+$/, '') // drop last word
+          bgDiv.textContent = cur
+          const newRects = (function () {
+            range.selectNodeContents(bgDiv)
+            return range.getClientRects()
+          })()
+          if (!newRects.length) break
+          const newLast = newRects[newRects.length - 1]
+          if (newLast.bottom <= containerHeight + epsilon) break
+        }
+      }
     }
   }
-
-  // Ensure last visible line is not cropped
-  bgDiv.textContent = bestFit
-  while (bgDiv.scrollHeight > containerHeight) {
-    bestFit = bestFit.slice(0, -1)
-    bgDiv.textContent = bestFit
-  }
 }
 
-// Always recompute from scratch on resize
-window.addEventListener('resize', () => {
-  if (window.backgroundTextData) {
-    fillBackgroundText(window.backgroundTextData) // rebuilds fully
-    console.log('rebuilding: ', window.backgroundTextData)
-  }
-})
-
-// Initialize background text
+// Expose a global initializer so your inline fetch can call it.
 function initBackgroundText (data) {
-  window.backgroundTextData = data
+  window.backgroundTextData = data // store globally so resize can reuse it
   fillBackgroundText(data)
-  console.log('initBackgroundText: ', data)
 }
+
+// Make sure it's available globally (helps if bundlers/scopes are used)
+window.initBackgroundText = initBackgroundText
+
+// If the fetch ran before this script loaded and saved data on window, handle that now:
+if (window.backgroundTextData) {
+  fillBackgroundText(window.backgroundTextData)
+}
+
+// Recompute on resize:
+window.addEventListener('resize', () => {
+  if (window.backgroundTextData) fillBackgroundText(window.backgroundTextData)
+})
